@@ -9,44 +9,57 @@
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     body { overscroll-behavior-y: none; }
-    #reader { position: relative; min-height: 270px; background: #000; }
+    #reader { position: relative; min-height: 280px; background: #000; border: none !important; }
     #reader video { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 0.75rem; }
 
-    /* Laser Scanner Beam Animation */
-    @keyframes scanLaser {
-      0% { top: 6%; opacity: 0.2; }
-      50% { opacity: 1; }
-      100% { top: 92%; opacity: 0.2; }
-    }
-    .laser-line {
-      position: absolute;
-      left: 10%;
-      right: 10%;
-      height: 2.5px;
-      background: linear-gradient(90deg, rgba(59,130,246,0) 0%, #38bdf8 25%, #22c55e 50%, #38bdf8 75%, rgba(59,130,246,0) 100%);
-      box-shadow: 0 0 14px 3px rgba(34, 197, 94, 0.85);
-      animation: scanLaser 2s infinite ease-in-out alternate;
-      z-index: 25;
-      pointer-events: none;
-    }
+    /* Hide library's internal duplicate white boxes/SVGs */
+    #reader__scan_region { border: none !important; }
+    #reader__scan_region * { border: none !important; }
+    #reader__scan_region svg { display: none !important; }
 
-    /* Target Box Corners */
+    /* Enhanced Target Frame */
     .scanner-target {
       position: absolute;
-      inset: 12%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 78%;
+      height: 78%;
+      max-width: 250px;
+      max-height: 250px;
       pointer-events: none;
       z-index: 20;
     }
+
     .corner {
       position: absolute;
-      width: 20px;
-      height: 20px;
+      width: 24px;
+      height: 24px;
       border-color: #38bdf8;
+      filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.8));
     }
-    .top-l { top: 0; left: 0; border-top: 3px solid #38bdf8; border-left: 3px solid #38bdf8; border-top-left-radius: 4px; }
-    .top-r { top: 0; right: 0; border-top: 3px solid #38bdf8; border-right: 3px solid #38bdf8; border-top-right-radius: 4px; }
-    .bot-l { bottom: 0; left: 0; border-bottom: 3px solid #38bdf8; border-left: 3px solid #38bdf8; border-bottom-left-radius: 4px; }
-    .bot-r { bottom: 0; right: 0; border-bottom: 3px solid #38bdf8; border-right: 3px solid #38bdf8; border-bottom-right-radius: 4px; }
+    .top-l { top: 0; left: 0; border-top: 3.5px solid #38bdf8; border-left: 3.5px solid #38bdf8; border-top-left-radius: 6px; }
+    .top-r { top: 0; right: 0; border-top: 3.5px solid #38bdf8; border-right: 3.5px solid #38bdf8; border-top-right-radius: 6px; }
+    .bot-l { bottom: 0; left: 0; border-bottom: 3.5px solid #38bdf8; border-left: 3.5px solid #38bdf8; border-bottom-left-radius: 6px; }
+    .bot-r { bottom: 0; right: 0; border-bottom: 3.5px solid #38bdf8; border-right: 3.5px solid #38bdf8; border-bottom-right-radius: 6px; }
+
+    /* Moving Laser Beam constrained inside Target Frame */
+    @keyframes scanLaser {
+      0% { top: 3%; opacity: 0.3; }
+      50% { opacity: 1; }
+      100% { top: 95%; opacity: 0.3; }
+    }
+    .laser-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2.5px;
+      background: linear-gradient(90deg, rgba(56,189,248,0) 0%, #38bdf8 25%, #22c55e 50%, #38bdf8 75%, rgba(56,189,248,0) 100%);
+      box-shadow: 0 0 12px 2px rgba(34, 197, 94, 0.9), 0 0 20px 4px rgba(56, 189, 248, 0.6);
+      animation: scanLaser 2s ease-in-out infinite alternate;
+      z-index: 25;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-10">
@@ -111,19 +124,17 @@
       <!-- Scanner Controls -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-3">
         
-        <!-- Live Viewport Container with Dynamic Laser & Target Box -->
+        <!-- Viewport Container with Clean Targeted Laser -->
         <div id="scannerWrapper" class="relative w-full rounded-xl overflow-hidden hidden bg-black">
           <div id="reader" class="w-full"></div>
           
-          <!-- Animated Laser Beam -->
-          <div id="laserBeam" class="laser-line hidden"></div>
-          
-          <!-- Viewfinder Target Corners -->
+          <!-- Viewfinder Frame with Integrated Laser -->
           <div id="targetBox" class="scanner-target hidden">
             <span class="corner top-l"></span>
             <span class="corner top-r"></span>
             <span class="corner bot-l"></span>
             <span class="corner bot-r"></span>
+            <div class="laser-line"></div>
           </div>
         </div>
         
@@ -142,8 +153,6 @@
 
       <!-- Result Card -->
       <div id="resultCard" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
-        
-        <!-- 1. CONSUMER & METER DETAILS (UPAR) -->
         <div class="space-y-3 text-sm">
           <div>
             <span class="text-xs text-slate-500 block">Consumer Name</span>
@@ -171,14 +180,12 @@
           </div>
         </div>
 
-        <!-- 2. QC STATUS & REJECTION DETAILS (NICHE) -->
         <div class="space-y-2 pt-3 border-t border-slate-100">
           <div class="flex items-center justify-between">
             <span class="text-xs uppercase font-bold text-slate-400">QC Status</span>
             <span id="resStatus" class="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider"></span>
           </div>
 
-          <!-- REJECTION METADATA (DATE, BY & REMARK) -->
           <div id="rejectionMetaBox" class="hidden bg-red-50 border border-red-100 rounded-xl p-2.5 space-y-1 text-xs">
             <div class="flex justify-between items-center text-slate-700">
               <span class="font-semibold text-slate-500">Rejection Date:</span>
@@ -194,7 +201,6 @@
             </div>
           </div>
         </div>
-
       </div>
 
       <!-- Not Found Card -->
@@ -560,17 +566,15 @@
       if (e.key === 'Enter') searchRecord(e.target.value);
     });
 
-    // --- BULLETPROOF UNIVERSAL CAMERA SCANNER WITH ANIMATION ---
+    // --- HIGH SPEED CAMERA SCANNER ---
     document.getElementById('scanBtn').addEventListener('click', async () => {
       const wrapper = document.getElementById('scannerWrapper');
-      const laser = document.getElementById('laserBeam');
       const target = document.getElementById('targetBox');
       const readerDiv = document.getElementById('reader');
       const btnText = document.getElementById('scanBtnText');
 
       if (!isScanning) {
         wrapper.classList.remove('hidden');
-        laser.classList.remove('hidden');
         target.classList.remove('hidden');
         readerDiv.innerHTML = "";
 
@@ -579,7 +583,7 @@
         const config = {
           fps: 25,
           qrbox: (w, h) => {
-            const size = Math.floor(Math.min(w, h) * 0.85);
+            const size = Math.floor(Math.min(w, h) * 0.8);
             return { width: size, height: size };
           },
           experimentalFeatures: {
@@ -637,7 +641,6 @@
 
     function stopScanner() {
       const wrapper = document.getElementById('scannerWrapper');
-      const laser = document.getElementById('laserBeam');
       const target = document.getElementById('targetBox');
       const readerDiv = document.getElementById('reader');
       const btnText = document.getElementById('scanBtnText');
@@ -645,14 +648,12 @@
       if (html5QrCode && isScanning) {
         html5QrCode.stop().then(() => {
           wrapper.classList.add('hidden');
-          laser.classList.add('hidden');
           target.classList.add('hidden');
           readerDiv.innerHTML = "";
           isScanning = false;
           btnText.innerText = "Open High-Speed Scanner";
         }).catch(() => {
           wrapper.classList.add('hidden');
-          laser.classList.add('hidden');
           target.classList.add('hidden');
           readerDiv.innerHTML = "";
           isScanning = false;
@@ -660,7 +661,6 @@
         });
       } else {
         wrapper.classList.add('hidden');
-        laser.classList.add('hidden');
         target.classList.add('hidden');
         readerDiv.innerHTML = "";
         isScanning = false;
