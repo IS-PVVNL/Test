@@ -9,9 +9,44 @@
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     body { overscroll-behavior-y: none; }
-    #reader { position: relative; min-height: 260px; background: #000; }
+    #reader { position: relative; min-height: 270px; background: #000; }
     #reader video { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 0.75rem; }
-    #reader__scan_region { display: flex; align-items: center; justify-content: center; }
+
+    /* Laser Scanner Beam Animation */
+    @keyframes scanLaser {
+      0% { top: 6%; opacity: 0.2; }
+      50% { opacity: 1; }
+      100% { top: 92%; opacity: 0.2; }
+    }
+    .laser-line {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      height: 2.5px;
+      background: linear-gradient(90deg, rgba(59,130,246,0) 0%, #38bdf8 25%, #22c55e 50%, #38bdf8 75%, rgba(59,130,246,0) 100%);
+      box-shadow: 0 0 14px 3px rgba(34, 197, 94, 0.85);
+      animation: scanLaser 2s infinite ease-in-out alternate;
+      z-index: 25;
+      pointer-events: none;
+    }
+
+    /* Target Box Corners */
+    .scanner-target {
+      position: absolute;
+      inset: 12%;
+      pointer-events: none;
+      z-index: 20;
+    }
+    .corner {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-color: #38bdf8;
+    }
+    .top-l { top: 0; left: 0; border-top: 3px solid #38bdf8; border-left: 3px solid #38bdf8; border-top-left-radius: 4px; }
+    .top-r { top: 0; right: 0; border-top: 3px solid #38bdf8; border-right: 3px solid #38bdf8; border-top-right-radius: 4px; }
+    .bot-l { bottom: 0; left: 0; border-bottom: 3px solid #38bdf8; border-left: 3px solid #38bdf8; border-bottom-left-radius: 4px; }
+    .bot-r { bottom: 0; right: 0; border-bottom: 3px solid #38bdf8; border-right: 3px solid #38bdf8; border-bottom-right-radius: 4px; }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-10">
@@ -75,8 +110,22 @@
 
       <!-- Scanner Controls -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-3">
-        <!-- Live Viewport Container -->
-        <div id="reader" class="w-full rounded-xl overflow-hidden hidden"></div>
+        
+        <!-- Live Viewport Container with Dynamic Laser & Target Box -->
+        <div id="scannerWrapper" class="relative w-full rounded-xl overflow-hidden hidden bg-black">
+          <div id="reader" class="w-full"></div>
+          
+          <!-- Animated Laser Beam -->
+          <div id="laserBeam" class="laser-line hidden"></div>
+          
+          <!-- Viewfinder Target Corners -->
+          <div id="targetBox" class="scanner-target hidden">
+            <span class="corner top-l"></span>
+            <span class="corner top-r"></span>
+            <span class="corner bot-l"></span>
+            <span class="corner bot-r"></span>
+          </div>
+        </div>
         
         <button id="scanBtn" class="w-full py-3.5 bg-blue-800 hover:bg-blue-900 text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow transition active:scale-95">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -511,21 +560,26 @@
       if (e.key === 'Enter') searchRecord(e.target.value);
     });
 
-    // --- BULLETPROOF UNIVERSAL CAMERA SCANNER ---
+    // --- BULLETPROOF UNIVERSAL CAMERA SCANNER WITH ANIMATION ---
     document.getElementById('scanBtn').addEventListener('click', async () => {
+      const wrapper = document.getElementById('scannerWrapper');
+      const laser = document.getElementById('laserBeam');
+      const target = document.getElementById('targetBox');
       const readerDiv = document.getElementById('reader');
       const btnText = document.getElementById('scanBtnText');
 
       if (!isScanning) {
-        readerDiv.classList.remove('hidden');
-        readerDiv.innerHTML = ""; // Clean previous renders
+        wrapper.classList.remove('hidden');
+        laser.classList.remove('hidden');
+        target.classList.remove('hidden');
+        readerDiv.innerHTML = "";
 
         html5QrCode = new Html5Qrcode("reader");
 
         const config = {
-          fps: 20,
+          fps: 25,
           qrbox: (w, h) => {
-            const size = Math.floor(Math.min(w, h) * 0.8);
+            const size = Math.floor(Math.min(w, h) * 0.85);
             return { width: size, height: size };
           },
           experimentalFeatures: {
@@ -541,29 +595,24 @@
         };
 
         try {
-          // Check available camera devices first
           const cameras = await Html5Qrcode.getCameras();
           let targetCameraId = null;
 
           if (cameras && cameras.length > 0) {
-            // Mobile Rear camera prioritization
             const backCam = cameras.find(c => 
               c.label.toLowerCase().includes('back') || 
               c.label.toLowerCase().includes('rear') || 
               c.label.toLowerCase().includes('environment')
             );
             targetCameraId = backCam ? backCam.id : cameras[0].id;
-
             await html5QrCode.start(targetCameraId, config, onScanSuccess, () => {});
           } else {
-            // Direct facingMode fallback
-            await html5QrCode.start({ facingMode: "user" }, config, onScanSuccess, () => {});
+            await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, () => {});
           }
 
           isScanning = true;
           btnText.innerText = "Stop Scanner";
 
-          // Force video stream to play (prevents black screen on laptops/mobiles)
           const vid = readerDiv.querySelector('video');
           if (vid) {
             vid.setAttribute('playsinline', 'true');
@@ -571,21 +620,13 @@
           }
 
         } catch (err) {
-          console.warn("Direct device ID start failed, trying standard fallback:", err);
           try {
-            await html5QrCode.start(
-              { facingMode: "environment" },
-              config,
-              onScanSuccess,
-              () => {}
-            );
+            await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, () => {});
             isScanning = true;
             btnText.innerText = "Stop Scanner";
           } catch (fallbackErr) {
-            alert("Camera on nahi ho saka. Browser permissions me camera allow karein.");
-            readerDiv.classList.add('hidden');
-            isScanning = false;
-            btnText.innerText = "Open High-Speed Scanner";
+            alert("Camera on nahi ho saka. Browser settings me camera permission check karein.");
+            stopScanner();
           }
         }
 
@@ -595,20 +636,35 @@
     });
 
     function stopScanner() {
+      const wrapper = document.getElementById('scannerWrapper');
+      const laser = document.getElementById('laserBeam');
+      const target = document.getElementById('targetBox');
+      const readerDiv = document.getElementById('reader');
+      const btnText = document.getElementById('scanBtnText');
+
       if (html5QrCode && isScanning) {
         html5QrCode.stop().then(() => {
-          const readerDiv = document.getElementById('reader');
-          readerDiv.classList.add('hidden');
+          wrapper.classList.add('hidden');
+          laser.classList.add('hidden');
+          target.classList.add('hidden');
           readerDiv.innerHTML = "";
           isScanning = false;
-          document.getElementById('scanBtnText').innerText = "Open High-Speed Scanner";
+          btnText.innerText = "Open High-Speed Scanner";
         }).catch(() => {
-          const readerDiv = document.getElementById('reader');
-          readerDiv.classList.add('hidden');
+          wrapper.classList.add('hidden');
+          laser.classList.add('hidden');
+          target.classList.add('hidden');
           readerDiv.innerHTML = "";
           isScanning = false;
-          document.getElementById('scanBtnText').innerText = "Open High-Speed Scanner";
+          btnText.innerText = "Open High-Speed Scanner";
         });
+      } else {
+        wrapper.classList.add('hidden');
+        laser.classList.add('hidden');
+        target.classList.add('hidden');
+        readerDiv.innerHTML = "";
+        isScanning = false;
+        btnText.innerText = "Open High-Speed Scanner";
       }
     }
 
