@@ -197,6 +197,18 @@
               <span id="resBarcode" class="font-semibold text-slate-800 font-mono"></span>
             </div>
           </div>
+          
+          <div class="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+            <div>
+              <span class="text-xs text-slate-500 block">Division</span>
+              <span id="resDivision" class="font-bold text-blue-800"></span>
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 block">Updated By (Tech)</span>
+              <span id="resTechnician" class="font-bold text-blue-800"></span>
+            </div>
+          </div>
+
         </div>
 
         <div class="space-y-2 pt-3 border-t border-slate-100">
@@ -287,7 +299,7 @@
       }
 
       try {
-        const req = indexedDB.open("MeterQCStore_StatusPlacementV2", 1);
+        const req = indexedDB.open("MeterQCStore_StatusPlacementV3", 2); 
         req.onupgradeneeded = function(e) {
           const d = e.target.result;
           if (!d.objectStoreNames.contains("meters")) {
@@ -399,6 +411,12 @@
             barcode: clean(r[62]).toUpperCase(),
             oldMeter: clean(r[64]),
             newMeter: clean(r[75]).toUpperCase(),
+            
+            // --- EXACT COLUMN NUMBERS MAPPED YAHAN HAIN ---
+            division: clean(r[4]),      // Column E (Zero-based index: 4)
+            technician: clean(r[133]),  // Column ED (Zero-based index: 133)
+            // ----------------------------------------------
+
             qcStatus: clean(r[134]),
             contractorReject: clean(r[143]),
             contractorDate: formatReadableDate(clean(r[144])),
@@ -513,6 +531,9 @@
         document.getElementById('resOldMeter').innerText = found.oldMeter || '-';
         document.getElementById('resNewMeter').innerText = found.newMeter || '-';
         document.getElementById('resBarcode').innerText = found.barcode || '-';
+        
+        document.getElementById('resDivision').innerText = found.division || '-';
+        document.getElementById('resTechnician').innerText = found.technician || '-';
 
         const st = document.getElementById('resStatus');
         const rawStatus = (found.qcStatus || '').trim();
